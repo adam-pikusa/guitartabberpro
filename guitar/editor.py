@@ -32,10 +32,10 @@ def start_editor(chosen: str) -> None:
     mousepos = []
     tab = {}
     for string in range(6):
-        for note_pos in range(TAB_LEN):
-            tab[string, note_pos] = ser.TabCell(
+        for index in range(TAB_LEN):
+            tab[string, index] = ser.TabCell(
                 cw, ch, cox, coy,
-                string, note_pos)
+                string, index)
 
     piano_keys = []
     if True:
@@ -114,7 +114,7 @@ def start_editor(chosen: str) -> None:
         nonlocal cursor
         for c in tab.values():
             if c.button.check_hover(mousepos):
-                cursor = c.note
+                cursor = c.index
                 return
 
     def clear_cell():
@@ -131,7 +131,7 @@ def start_editor(chosen: str) -> None:
                 c.marked = True
                 return
 
-    def get_piano_key_state(octave: int, note: int) -> int:
+    def get_piano_key_state(octave: int, index: int) -> int:
         nonlocal cursor
         nonlocal tab
 
@@ -141,7 +141,7 @@ def start_editor(chosen: str) -> None:
             if c.val >= len(cst.STRINGS[0]): continue
             tab_key = cst.STRINGS[string][c.val]
             
-            if tab_key[0] == octave and tab_key[1] == note:
+            if tab_key[0] == octave and tab_key[1] == index:
                 return 1 # ACTIVE
 
         for c in tab.values():
@@ -149,13 +149,13 @@ def start_editor(chosen: str) -> None:
             # all cells marked and valid
             tab_key = cst.STRINGS[c.string][c.val]
             
-            if tab_key[0] == octave and tab_key[1] == note:
+            if tab_key[0] == octave and tab_key[1] == index:
                 return 2 # MARKED
 
         return 0 # NONE
 
     def get_tab_cell_state(cell: ser.TabCell) -> int:
-        if cell.note != cursor: return None
+        if cell.index != cursor: return None
         # cells under cursor
 
         choices = []
@@ -165,8 +165,8 @@ def start_editor(chosen: str) -> None:
             # single hovered key
             
             for s, string in enumerate(cst.STRINGS):
-                for n, note in enumerate(string):
-                    if note[0] == pk.octave and note[1] == pk.note:
+                for n, index in enumerate(string):
+                    if index[0] == pk.octave and index[1] == pk.index:
                         choices.append((s, n))
                         break
 
@@ -185,14 +185,14 @@ def start_editor(chosen: str) -> None:
                 move = -4 if c.string == 2 else -5
                 temp = c.val + move
                 if temp < 0: return
-                tab[c.string - 1, c.note].val = temp
+                tab[c.string - 1, c.index].val = temp
                 c.val = None
 
             else:
                 if c.string > 4: return
                 move = 4 if c.string == 1 else 5
                 temp = c.val + move
-                tab[c.string + 1, c.note].val = temp
+                tab[c.string + 1, c.index].val = temp
                 c.val = None
 
     def transpose(by: int):
@@ -300,7 +300,7 @@ def start_editor(chosen: str) -> None:
         pg.draw.line(screen, GREY, (cursor_x, 0), (cursor_x, 6*ch+6*coy))
 
         for pk in piano_keys:
-            res = get_piano_key_state(pk.octave, pk.note)
+            res = get_piano_key_state(pk.octave, pk.index)
             pg.draw.rect(screen, 
                 RED if res == 1 
                 else BLUE if res == 2 

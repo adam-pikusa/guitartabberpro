@@ -1,5 +1,5 @@
+import json
 import os
-import re
 import guitar.fileio as fio
 
 class Button:
@@ -25,26 +25,26 @@ class Button:
             self.y + self.h > pos[1])
 
 class TabCell:
-    def __init__(self, cw: int, ch: int, cox: int, coy: int, string: int, note: int) -> None:
+    def __init__(self, cw: int, ch: int, cox: int, coy: int, string: int, index: int) -> None:
         self.button = Button(
-            (cw + cox) * note,
+            (cw + cox) * index,
             (ch + coy) * string,
             cw, ch)
 
         self.string = string
-        self.note = note
+        self.index = index
         
         self.val = None
         self.marked = False
 
 class PianoKey:
-    def __init__(self, x, y, w, h, octave: int, note: int, sharp: bool) -> None:
+    def __init__(self, x, y, w, h, octave: int, index: int, sharp: bool) -> None:
         self.button = Button(x, y, w, h)
 
         self.sharp = sharp
 
         self.octave = octave
-        self.note = note
+        self.index = index
 
         self.hover = False
 
@@ -82,14 +82,26 @@ def export_to_file(name: str, data: dict):
     
     D = 'description'
 
-    if not os.path.exists(path):
-        print(path, 'does not exist')
-        return
-    
-    with open(path, 'w') as f:
-        if D in data:
-            f.write(f'! DESC {data[D]}')
+    notes = []
 
-        for c in cells:
-            if c.val != None:
-                f.write(f'{c.string};{c.note};{c.val}\n')
+    for c in cells:
+        if c.val != None:
+            notes.append([
+                c.string, 
+                c.index, 
+                c.val
+            ])
+
+    section = {
+        'name': str(section_num),
+        'notes': notes
+    }
+    payload = {}
+
+    if D in data:
+        payload[D] = data[D]
+
+    payload['sections'] = [section]
+    
+    with open(fr'gtp_files/{name}.gtp', 'w') as f:
+        json.dump(payload, f)

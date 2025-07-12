@@ -1,2 +1,7 @@
-m_files/
 __pycache__/
+venv/
+.venv/
+env/
+.env/
+gtp_files/
+!gtp_files/sample.gtp
