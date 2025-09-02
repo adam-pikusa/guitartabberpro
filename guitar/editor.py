@@ -1,6 +1,8 @@
 import pygame as pg
 import guitar.const as cst
-import guitar.serialization as ser
+import guitar.models as models
+import guitar.state as state
+import guitar.utils as utils
 
 BLACK = [0,0,0]
 RED = [240,0,0]
@@ -17,75 +19,61 @@ cw, ch = 20, 20
 cox, coy = 3, 3
 TAB_LEN = 60
 
-def start_editor(chosen: str) -> None:    
+def create_tab_cells() -> dict:
+    tab = {}
+    for string in range(6):
+        for chord_index in range(TAB_LEN):
+            tab[string, chord_index] = models.TabCell(
+                cw, ch, cox, coy,
+                string, chord_index)
+    return tab
+
+def create_piano_keys() -> list:
+    piano_keys = []
+    kb_x = 30
+    kb_y = 6*ch+6*coy + 20
+    k_w, k_h = 25, 80
+    k_o = 3
+    for octave in range(4):
+        g_x = kb_x + octave * (7 * (k_w + k_o) + 6)
+
+        for i, key in enumerate((0, 2, 4, 5, 7, 9, 11)):
+            piano_keys.append(models.PianoKey(
+                g_x + i * (k_w + k_o), kb_y, 
+                k_w, k_h, 
+                (octave - 2) * 12 + key, False))
+                
+        for i, key in enumerate((1, 3)):
+            piano_keys.append(models.PianoKey(
+                g_x + k_w * 0.7 + i * (k_w + k_o) * 1.1, kb_y,
+                k_w * 0.75, k_h * 0.5,
+                (octave - 2) * 12 + key, True))  
+
+        for i, key in enumerate((6, 8, 10)):
+            piano_keys.append(models.PianoKey(
+                g_x + 3 * (k_w + k_o) + k_w * 0.7 + i * (k_w + k_o) * 1.05, kb_y,
+                k_w * 0.75, k_h * 0.5,
+                (octave - 2) * 12 + key, True))
+            
+    return piano_keys
+
+def update_caption(current_section: int) -> None:
+    pg.display.set_caption(f"guitar tabber pro - {state.get().file_path} - {state.get().piece[current_section]['description']}")
+
+def start_editor() -> None:    
     pg.init()
 
     font = pg.font.SysFont("Arial", 15)
     screen = pg.display.set_mode((w,h))
     clock = pg.time.Clock()
 
-    desc = None
-    m_part_num = 0
+    current_section = 0
     cursor = 0
     lmb, rmb = False, False
     clear = False
     mousepos = []
-    tab = {}
-    for string in range(6):
-        for index in range(TAB_LEN):
-            tab[string, index] = ser.TabCell(
-                cw, ch, cox, coy,
-                string, index)
-
-    piano_keys = []
-    if True:
-        kb_x = 30
-        kb_y = 6*ch+6*coy + 20
-        k_w, k_h = 25, 80
-        k_o = 3
-        for octave in range(4):
-            g_x = kb_x + octave * (7 * (k_w + k_o) + 6)
-            for key in range(7):
-                piano_keys.append(ser.PianoKey(
-                    g_x + key * (k_w + k_o), kb_y, 
-                    k_w, k_h, octave, key, False))
-                    
-            for key in range(2):
-                piano_keys.append(ser.PianoKey(
-                    g_x
-                    + k_w * 0.7
-                    + key * (k_w + k_o) * 1.1, kb_y,
-                    k_w * 0.75, k_h * 0.5,
-                    octave, key + 7, True))  
-
-            for key in range(3):
-                piano_keys.append(ser.PianoKey(
-                    g_x 
-                    + 3 * (k_w + k_o)
-                    + k_w * 0.7
-                    + key * (k_w + k_o) * 1.05, kb_y,
-                    k_w * 0.75, k_h * 0.5,
-                    octave, key + 7 + 2, True))
-
-    def load(data: dict):
-        notes = data['notes']
-        if notes == None: return
-
-        nonlocal tab
-        for c in tab.values():
-            c.val = None
-        for n in notes:
-            tab[n[0],n[1]].val = n[2]
-
-        window_title = f"guitar tabber pro - {chosen}"
-
-        nonlocal desc
-        D = 'description'
-        if D in data: 
-            desc = data[D]
-            window_title += f' - {desc}'
-
-        pg.display.set_caption(window_title)
+    tab = create_tab_cells()
+    piano_keys = create_piano_keys()
 
     def kp_click(num: int):
         nonlocal cursor
@@ -98,30 +86,30 @@ def start_editor(chosen: str) -> None:
             target = tab[num, cursor]
             res = get_tab_cell_state(target)
             if res != None:
-                target.val = res
+                target.set_fret(current_section, res)
                 cursor += 1 
                 return
 
         for c in tab.values():
             if c.button.check_hover(mousepos):
-                if c.val == 1:
-                    c.val = num + 10
+                if c.get_fret(current_section) == 1:
+                    c.set_fret(current_section, num + 10)
                 else:
-                    c.val = num
+                    c.set_fret(current_section, num)
                 return
 
     def update_cur():
         nonlocal cursor
         for c in tab.values():
             if c.button.check_hover(mousepos):
-                cursor = c.index
+                cursor = c.chord_index
                 return
 
     def clear_cell():
         nonlocal mousepos
         for c in tab.values():
             if c.button.check_hover(mousepos):
-                c.val = None
+                c.clear_fret(current_section)
                 return
 
     def mark_cell():
@@ -131,31 +119,33 @@ def start_editor(chosen: str) -> None:
                 c.marked = True
                 return
 
-    def get_piano_key_state(octave: int, index: int) -> int:
+    def get_piano_key_state(pk: models.PianoKey) -> int:
         nonlocal cursor
         nonlocal tab
 
         for string in range(6):
             c = tab[string, cursor]
-            if c.val == None: continue
-            if c.val >= len(cst.STRINGS[0]): continue
-            tab_key = cst.STRINGS[string][c.val]
+            fret = c.get_fret(current_section)
+            if fret == None: continue
+            if fret >= len(cst.STRINGS[0]): continue
+            tab_key = cst.STRINGS[string][fret]
             
-            if tab_key[0] == octave and tab_key[1] == index:
+            if tab_key == pk.note:
                 return 1 # ACTIVE
 
         for c in tab.values():
-            if not c.marked or c.val == None or c.val >= len(cst.STRINGS[0]): continue
+            fret = c.get_fret(current_section)
+            if not c.marked or fret == None or fret >= len(cst.STRINGS[0]): continue
             # all cells marked and valid
-            tab_key = cst.STRINGS[c.string][c.val]
+            tab_key = cst.STRINGS[c.string][fret]
             
-            if tab_key[0] == octave and tab_key[1] == index:
+            if tab_key == pk.note:
                 return 2 # MARKED
 
         return 0 # NONE
 
-    def get_tab_cell_state(cell: ser.TabCell) -> int:
-        if cell.index != cursor: return None
+    def get_tab_cell_state(cell: models.TabCell) -> int | None:
+        if cell.chord_index != cursor: return None
         # cells under cursor
 
         choices = []
@@ -164,10 +154,10 @@ def start_editor(chosen: str) -> None:
             if not pk.hover: continue
             # single hovered key
             
-            for s, string in enumerate(cst.STRINGS):
-                for n, index in enumerate(string):
-                    if index[0] == pk.octave and index[1] == pk.index:
-                        choices.append((s, n))
+            for string, frets in enumerate(cst.STRINGS):
+                for fret, note in enumerate(frets):
+                    if note == pk.note:
+                        choices.append((string, fret))
                         break
 
         for c in choices:
@@ -179,39 +169,30 @@ def start_editor(chosen: str) -> None:
     def move_note(up: bool) -> None:
         nonlocal mousepos
         for c in tab.values():
-            if not (c.button.check_hover(mousepos) and c.val != None): continue
+            fret = c.get_fret(current_section)
+            if not (c.button.check_hover(mousepos) and fret != None): continue
             if up:
                 if c.string < 1: return
                 move = -4 if c.string == 2 else -5
-                temp = c.val + move
+                temp = fret + move
                 if temp < 0: return
-                tab[c.string - 1, c.index].val = temp
-                c.val = None
+                tab[c.string - 1, c.chord_index].set_fret(current_section, temp)
+                c.clear_fret(current_section)
 
             else:
                 if c.string > 4: return
                 move = 4 if c.string == 1 else 5
-                temp = c.val + move
-                tab[c.string + 1, c.index].val = temp
-                c.val = None
+                temp = fret + move
+                tab[c.string + 1, c.chord_index].set_fret(current_section, temp)
+                c.clear_fret(current_section)
 
     def transpose(by: int):
         for c in tab.values():
-            if c.val != None:
-                c.val += by
+            fret = c.get_fret(current_section)
+            if fret != None:
+                c.set_fret(current_section, fret + by)
 
-    def insert_empty(position: int):
-        nonlocal tab
-
-        for string in range(6):
-            pos = TAB_LEN - 1
-
-            while pos > position:
-                tab[string, pos].val = tab[string, pos - 1].val
-
-                pos -= 1 
-
-    load(ser.import_from_file(chosen, 0))
+    update_caption(current_section)
 
     while True:
         for event in pg.event.get():
@@ -248,22 +229,19 @@ def start_editor(chosen: str) -> None:
                     pg.quit()
 
                 elif event.key == pg.K_c: clear = True
-                elif event.key == pg.K_e: ser.export_to_file(chosen, { 
-                    'section_num': m_part_num, 
-                    'cells': tab.values(),
-                    'description': desc })
-                elif event.key == pg.K_r: load(ser.import_from_file(chosen, m_part_num))
+                elif event.key == pg.K_e: state.get().save_file()
+                elif event.key == pg.K_r: state.get().reload_file()
                 elif event.key == pg.K_t: transpose(int(input('transpose by>')))
-                elif event.key == pg.K_i: insert_empty(cursor)
+                elif event.key == pg.K_i: state.get().insert_empty_chord(current_section, cursor)
 
                 elif event.key == pg.K_LEFT and cursor > 0: cursor -= 1
                 elif event.key == pg.K_RIGHT: cursor += 1 
-                elif event.key == pg.K_UP:
-                    m_part_num += 1
-                    load(ser.import_from_file(chosen, m_part_num))
-                elif event.key == pg.K_DOWN and m_part_num > 0:
-                    m_part_num -= 1
-                    load(ser.import_from_file(chosen, m_part_num))
+                elif event.key == pg.K_UP and current_section < len(state.get().piece) - 1:
+                    current_section += 1
+                    update_caption(current_section)
+                elif event.key == pg.K_DOWN and current_section > 0:
+                    current_section -= 1
+                    update_caption(current_section)
 
                 elif event.key == pg.K_g: move_note(True)
                 elif event.key == pg.K_b: move_note(False)
@@ -286,12 +264,13 @@ def start_editor(chosen: str) -> None:
         screen.fill(GREY)
 
         for c in tab.values():
+            fret = c.get_fret(current_section)
             res = get_tab_cell_state(c)
             pg.draw.rect(screen, LIGHTBLUE if c.marked else WHITE, c.button.rect)
-            if c.val != None or res != None:
+            if fret != None or res != None:
                 screen.blit(
                     font.render(
-                        ' {}'.format(c.val if res == None else res), 
+                        ' {}'.format(fret if res == None else res), 
                         True, 
                         BLACK if res == None else MAGENTA), 
                     c.button.rect)
@@ -300,7 +279,7 @@ def start_editor(chosen: str) -> None:
         pg.draw.line(screen, GREY, (cursor_x, 0), (cursor_x, 6*ch+6*coy))
 
         for pk in piano_keys:
-            res = get_piano_key_state(pk.octave, pk.index)
+            res = get_piano_key_state(pk)
             pg.draw.rect(screen, 
                 RED if res == 1 
                 else BLUE if res == 2 
