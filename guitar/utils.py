@@ -1,3 +1,5 @@
+import guitar.const as cst
+
 def print_piece(piece: list, column_limit: int) -> None:
     header = ''
     lines = [''] * 6
@@ -48,3 +50,13 @@ def print_piece(piece: list, column_limit: int) -> None:
         print(header)
         for line in lines:
             print(line)
+
+
+def detect_chord(notes: list) -> str | None:
+    for chord_name, chord_notes in cst.CHORD_NOTES.items():
+        mod_notes = [cst.STRINGS[note[0]][note[1]] % 12 for note in notes]
+        if len(set(mod_notes)) > 2 and all((mod_note in chord_notes) for mod_note in mod_notes):
+            return chord_name
+        
+    return None
+                

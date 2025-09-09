@@ -26,6 +26,12 @@ class State:
     def insert_empty_chord(self, current_section: int, chord_index: int) -> None:
         self.piece[current_section]['chords'].insert(chord_index, [])
 
+    def get_chord(self, current_section: int, chord_index: int) -> list | None:
+        chords = self.piece[current_section]['chords']
+        if len(chords) <= chord_index:
+            return None
+        return chords[chord_index]
+
     def new_file(self, file_path: Path) -> None:
         self.file_path = file_path
         self.piece = create_empty_piece()

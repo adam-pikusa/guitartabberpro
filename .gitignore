@@ -3,5 +3,5 @@ venv/
 .venv/
 env/
 .env/
-gtp_files/
-!gtp_files/sample.gtp
+gtp/
+m_files/

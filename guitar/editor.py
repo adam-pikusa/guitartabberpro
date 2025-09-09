@@ -275,6 +275,17 @@ def start_editor() -> None:
                         BLACK if res == None else MAGENTA), 
                     c.button.rect)
 
+        for chord_index in range(TAB_LEN):
+            chord = state.get().get_chord(current_section, chord_index)
+            if chord is None: continue
+            chord_name = utils.detect_chord(chord)
+            if chord_name is None: continue
+            screen.blit(
+                font.render(
+                    chord_name, True, WHITE
+                ), (chord_index * (cw + cox), (ch + coy) * 6, cw, ch)
+            )
+
         cursor_x = cursor * (cw + cox) + cw * 0.5
         pg.draw.line(screen, GREY, (cursor_x, 0), (cursor_x, 6*ch+6*coy))
 
