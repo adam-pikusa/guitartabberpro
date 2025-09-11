@@ -1,7 +1,7 @@
 # a musical piece is made up of sections
-# a section is an array of chords
+# a section is an array of chords, with some additional metadata
 # a chord is a collection of notes
-# a guitar note is a string string index (0 based) and fret (0 based)
+# a guitar note is a string index (0 based) and fret (0 based)
 
 import json
 from pathlib import Path

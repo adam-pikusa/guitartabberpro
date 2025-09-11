@@ -1,4 +1,4 @@
-# manual version 2.2
+# manual version 3.0
 
 # cell grid
 

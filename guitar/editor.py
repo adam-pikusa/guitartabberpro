@@ -270,7 +270,7 @@ def start_editor() -> None:
             if fret != None or res != None:
                 screen.blit(
                     font.render(
-                        ' {}'.format(fret if res == None else res), 
+                        f'{fret if res == None else res:>3}', 
                         True, 
                         BLACK if res == None else MAGENTA), 
                     c.button.rect)
